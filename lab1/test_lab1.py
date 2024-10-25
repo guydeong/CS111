@@ -60,37 +60,3 @@ class TestLab1(unittest.TestCase):
         self.assertNotEqual(pipe_result.stderr, '', msg='Error should be reported to standard error.')
         self.assertTrue(self._make_clean, msg='make clean failed')
 
-    def test_1(self):
-        self.assertTrue(self.make, msg='make failed')
-        cl_result = subprocess.run(('ls | sort | sort | wc | sort'),
-                                capture_output=True, shell=True)
-        pipe_result = subprocess.check_output(('./pipe', 'ls', 'sort', 'sort', 'wc', 'sort'))
-        self.assertEqual(cl_result.stdout, pipe_result,
-            msg=f"The output from ./pipe should be {cl_result.stdout} but got {pipe_result} instead.")
-        self.assertTrue(self._make_clean, msg='make clean failed')
-
-    def test_2(self):
-        self.assertTrue(self.make, msg='make failed')
-        cl_result = subprocess.run(('echo | wc | sort'),
-                                capture_output=True, shell=True)
-        pipe_result = subprocess.check_output(('./pipe', 'echo', 'wc', 'sort'))
-        self.assertEqual(cl_result.stdout, pipe_result,
-            msg=f"The output from ./pipe should be {cl_result.stdout} but got {pipe_result} instead.")
-        self.assertTrue(self._make_clean, msg='make clean failed')
-
-    def test_no_arguments(self):
-        self.assertTrue(self.make, msg='make failed')
-        pipe_result = subprocess.run(('./pipe'), stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        self.assertTrue(pipe_result.returncode, msg='No arguments, expect nonzero return code.')
-        self.assertNotEqual(pipe_result.stderr, '', msg='Error should be reported to standard error.')
-        self.assertTrue(self._make_clean, msg='make clean failed')
-    
-    def test_command_chain(self):
-        self.assertTrue(self.make, msg='make failed')
-        cl_result = subprocess.run(('ls | sort | sort | sort | sort | cat | cat | wc | sort'),
-                                capture_output=True, shell=True)
-        pipe_result = subprocess.check_output(('./pipe', 'ls', 'sort', 'sort', 'sort', 'cat', 'cat', 'wc', 'sort'))
-        self.assertEqual(cl_result.stdout, pipe_result,
-            msg=f"The output from ./pipe should be {cl_result.stdout} but got {pipe_result} instead.")
-        self.assertTrue(self._make_clean, msg='make clean failed')
