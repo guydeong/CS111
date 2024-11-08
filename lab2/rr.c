@@ -183,107 +183,109 @@ int main(int argc, char *argv[])
   while (num_finished_processes < size) {
     // Check which processes have arrived and append to the linked list
     for (int i = 0; i < size; i++) {
-      if (current_time == data[i].arrival_time) {
-        struct process *new_node = malloc(sizeof(struct process));
-        if (new_node == NULL) {
-          perror("Failed to allocate memory for new_node");
-          exit(EXIT_FAILURE);
+        if (current_time == data[i].arrival_time) {
+            if (data[i].burst_time <= 0) {
+                // Process has zero burst time, consider it finished
+                num_finished_processes++;
+                continue;
+            }
+            struct process *new_node = malloc(sizeof(struct process));
+            if (new_node == NULL) {
+                perror("Failed to allocate memory for new_node");
+                exit(EXIT_FAILURE);
+            }
+            // Main parameters
+            new_node->pid = data[i].pid;
+            new_node->arrival_time = data[i].arrival_time;
+            new_node->burst_time = data[i].burst_time;
+            // Extra parameters
+            new_node->remaining_total_time = data[i].burst_time;
+            new_node->waiting_time = 0;
+            new_node->not_run_yet = true;
+            // Define remaining time
+            new_node->run_remaining_time = calculate_time_slice(new_node->remaining_total_time, quantum_length);
+            // Insert new node at the head of the list
+            TAILQ_INSERT_HEAD(&list, new_node, pointers);
         }
+    }
 
-        // Main parameters
-        new_node->pid = data[i].pid;
-        new_node->arrival_time = data[i].arrival_time;
-        new_node->burst_time = data[i].burst_time;
-
-        // Extra parameters
-        new_node->remaining_total_time = data[i].burst_time;
-        new_node->waiting_time = 0;
-        new_node->not_run_yet = true;
-
-        // Define remaining time
-        new_node->run_remaining_time = calculate_time_slice(new_node->remaining_total_time, quantum_length);
-
-        // Insert new node at the head of the list
-        TAILQ_INSERT_HEAD(&list, new_node, pointers);
-
-        printf("Node %d has entered\n", new_node->pid);
-      }
-  }
 
   // Check if the list is not empty before proceeding with Round Robin logic
   if (!TAILQ_EMPTY(&list)) {
-      // Case 1: The currently running process has time left in its time slice => keep running `current_process`
-      if (current_process != NULL && current_process->run_remaining_time > 0) {
-          current_process->remaining_total_time -= 1;
-          current_process->run_remaining_time -= 1;
+    // Case 1: The currently running process has time left in its time slice => keep running `current_process`
+    if (current_process != NULL && current_process->run_remaining_time > 0) {
+      current_process->remaining_total_time -= 1;
+      current_process->run_remaining_time -= 1;
+    }
+    // Case 2: Time slice expired
+    else if(current_process != NULL && current_process->run_remaining_time <= 0){
+      struct process *temp = TAILQ_LAST(&list, process_list);
+    
+      // Case 1: Process has completed its total runtime, remove from the queue
+      if (temp->remaining_total_time <= 0) {
+        TAILQ_REMOVE(&list, temp, pointers);
+        num_finished_processes++;
+        free(temp); 
+        current_process = NULL;
       }
-      // Case 2: Time slice expired or no process scheduled => Schedule a new process
+      // Case 2: Process has time left, reinsert it at the head for Round Robin
       else {
-          struct process *temp = TAILQ_LAST(&list, process_list);
-
-          if (temp != NULL) {
-              // Case 1: Process has completed its total runtime, remove from the queue
-              if (temp->remaining_total_time <= 0) {
-                  TAILQ_REMOVE(&list, temp, pointers);
-                  num_finished_processes++;
-                  free(temp);  // Free the process as it's done
-                  current_process = NULL;  // Clear `current_process` as it's finished
-              }
-              // Case 2: Process has time left, reinsert it at the head for Round Robin
-              else {
-                  TAILQ_REMOVE(&list, temp, pointers);  // Remove from tail position
-                  // Insert the process at the head of the list to maintain Round Robin order
-                  TAILQ_INSERT_HEAD(&list, temp, pointers);
-                  
-              }
-              //Schedule the next process if queue not empty
-              if (!TAILQ_EMPTY(&list)){
-                temp = TAILQ_LAST(&list, process_list);
-                // Update `current_process` to point to the reinserted process
-                current_process = temp;
-                // Set the new time slice for the process
-                temp->run_remaining_time = calculate_time_slice(temp->remaining_total_time, quantum_length);
-                // If the process has not yet run, set its response time
-                if (temp->not_run_yet == true) {
-                    temp->response_time = current_time - (temp->arrival_time);
-                    total_response_time += temp->response_time;
-                    temp->not_run_yet = false;
-                }
-                // Decrement `current_process` times immediately after setting it
-                current_process->run_remaining_time -= 1;
-                current_process->remaining_total_time -= 1;
-              }
-          }
-          
-          
+        TAILQ_REMOVE(&list, temp, pointers);
+        TAILQ_INSERT_HEAD(&list, temp, pointers);
+      }
+      //Schedule the next process if queue not empty
+      if (!TAILQ_EMPTY(&list)){
+        temp = TAILQ_LAST(&list, process_list);
+        // Update `current_process` to point to the reinserted process
+        current_process = temp;
+        // Set the new time slice for the process
+        temp->run_remaining_time = calculate_time_slice(temp->remaining_total_time, quantum_length);
+        // If the process has not yet run, set its response time
+        if (temp->not_run_yet == true) {
+            temp->response_time = current_time - (temp->arrival_time);
+            total_response_time += temp->response_time;
+            temp->not_run_yet = false;
         }
-        if (current_process != NULL) {
-          printf("%d, ", current_process->pid);
-          printf("Remaining Time: %d\n", current_process->run_remaining_time);
-          char s[1024] = "";  // Allocate enough space for the queue display
-          struct process *t;
-
-          TAILQ_FOREACH(t, &list, pointers) {
-              char buffer[20];  // Temporary buffer for each process's data
-              sprintf(buffer, "PID: %d, ", t->pid);  // Format process info (e.g., using PID)
-              strncat(s, buffer, sizeof(s) - strlen(s) - 1);  // Append to `s` safely
-          }
-
-          printf("Current Process Queue: %s\n", s);
-        }
+        // Decrement `current_process` times immediately after setting it
+        current_process->run_remaining_time -= 1;
+        current_process->remaining_total_time -= 1;
+      }
     }
-
-    // Increment the wait time for all processes except `current_process`
-    struct process *temp;
-    TAILQ_FOREACH(temp, &list, pointers) {
-        if (temp != current_process) {
-            temp->waiting_time += 1;
-            total_waiting_time += 1;
+    // Case 3: Current Process is empty. Schedule the next process on the list
+    else{
+      struct process *temp = TAILQ_LAST(&list, process_list);
+      //Schedule the next process if queue not empty
+      if (!TAILQ_EMPTY(&list)){
+        temp = TAILQ_LAST(&list, process_list);
+        // Update `current_process` to point to the reinserted process
+        current_process = temp;
+        // Set the new time slice for the process
+        temp->run_remaining_time = calculate_time_slice(temp->remaining_total_time, quantum_length);
+        // If the process has not yet run, set its response time
+        if (temp->not_run_yet == true) {
+            temp->response_time = current_time - (temp->arrival_time);
+            total_response_time += temp->response_time;
+            temp->not_run_yet = false;
         }
-    }
+        // Decrement `current_process` times immediately after setting it
+        current_process->run_remaining_time -= 1;
+        current_process->remaining_total_time -= 1;
+      }
 
-    // Increment time
-    current_time++;
+
+    }
+  }
+  
+  // Increment the wait time for all processes except `current_process`
+  struct process *temp;
+  TAILQ_FOREACH(temp, &list, pointers) {
+      if (temp != current_process) {
+          temp->waiting_time += 1;
+          total_waiting_time += 1;
+      }
+  }
+  // Increment time
+  current_time++;
   }
 
   //Remove all elements and free all memory
@@ -294,7 +296,6 @@ int main(int argc, char *argv[])
   }
 
   /* End of "Your code here" */
-
   printf("Average waiting time: %.2f\n", (float)total_waiting_time / (float)size);
   printf("Average response time: %.2f\n", (float)total_response_time / (float)size);
 
