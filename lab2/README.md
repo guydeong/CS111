@@ -9,7 +9,7 @@ To compile the `rr` executable, use the following command:
 make
 ```
 
-This will build the `rr` program using the provided `Makefile`. Ensure that you are in the `lab-02` directory where the skeleton code resides.
+This will build the `rr` program using the provided `Makefile`. Ensure that you are in the directory where the skeleton code resides.
 
 ## Running
 To run the `rr` executable, use the following command format:

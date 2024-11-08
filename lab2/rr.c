@@ -146,16 +146,6 @@ void init_processes(const char *path,
   close(fd);
 }
 
-//Helper Function 1
-int calculate_time_slice(int remaining_time, int quanta){
-  if(remaining_time>quanta){
-    return quanta;
-  }
-  else{
-    return remaining_time;
-  }
-}
-
 int main(int argc, char *argv[])
 {
   if (argc != 3)
@@ -176,6 +166,15 @@ int main(int argc, char *argv[])
 
   /* Your code here */
 
+  //Helper Function 1
+  int calculate_time_slice(int remaining_time, int quanta){
+    if(remaining_time>quanta){
+      return quanta;
+    }
+    else{
+      return remaining_time;
+    }
+  }
   u32 current_time = 0;
   u32 num_finished_processes = 0;
   struct process *current_process = NULL;  // Ensure current_process is initialized to NULL
