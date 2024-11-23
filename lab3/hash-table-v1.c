@@ -27,7 +27,13 @@ struct hash_table_v1 {
 
 struct hash_table_v1 *hash_table_v1_create()
 {
+	uint32_t error = 0;
 	struct hash_table_v1 *hash_table = calloc(1, sizeof(struct hash_table_v1));
+	//Initiliaze the lock
+	error = pthread_mutex_init(&hash_table->lock, NULL);
+	if (error != 0){
+		exit(error);
+	}
 	assert(hash_table != NULL);
 	for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
 		struct hash_table_entry *entry = &hash_table->entries[i];
@@ -74,7 +80,9 @@ void hash_table_v1_add_entry(struct hash_table_v1 *hash_table,
                              const char *key,
                              uint32_t value)
 {
-	int error = pthread_mutex_lock(&hash_table->lock);
+	//Lock
+	uint32_t error = 0;
+	error = pthread_mutex_lock(&hash_table->lock);
 	if (error != 0){
 		exit(error);
 	}
@@ -84,6 +92,11 @@ void hash_table_v1_add_entry(struct hash_table_v1 *hash_table,
 	/* Update the value if it already exists */
 	if (list_entry != NULL) {
 		list_entry->value = value;
+		//Case 1 Unlock
+		error = pthread_mutex_unlock(&hash_table->lock);
+		if (error != 0){
+			exit(error);
+		}
 		return;
 	}
 
@@ -93,6 +106,7 @@ void hash_table_v1_add_entry(struct hash_table_v1 *hash_table,
 
 	
 	SLIST_INSERT_HEAD(list_head, list_entry, pointers);
+	//Case 2 Unlock
 	error = pthread_mutex_unlock(&hash_table->lock);
 	if (error != 0){
 		exit(error);
@@ -112,6 +126,7 @@ uint32_t hash_table_v1_get_value(struct hash_table_v1 *hash_table,
 
 void hash_table_v1_destroy(struct hash_table_v1 *hash_table)
 {
+	uint32_t error = 0;
 	for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
 		struct hash_table_entry *entry = &hash_table->entries[i];
 		struct list_head *list_head = &entry->list_head;
@@ -123,7 +138,7 @@ void hash_table_v1_destroy(struct hash_table_v1 *hash_table)
 		}
 	}
 	//Destroy Hash Table Lock
-	int error = pthread_mutex_destroy(&hash_table->lock);
+	error = pthread_mutex_destroy(&hash_table->lock);
 	if (error != 0){
 		exit(error);
 	}
